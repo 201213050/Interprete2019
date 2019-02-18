@@ -1,0 +1,134 @@
+package Analisis; // Paquete
+import java_cup.runtime.*; 
+import AST.*;
+import java.util.ArrayList;
+
+parser code
+{:
+
+    public Nodo inicio;
+    public String error="";
+    public Metodo metodo;
+    
+    public void syntax_error(Symbol s)
+    {
+        System.err.println("El analizador se recupero tras el error\nError en la Línea " + (s.right+1) +" Columna "+(s.left+1)+ ". Identificador "
+        +s.value + " no reconocido." );        
+    }
+
+    /**Metodo al que se llama en el momento en que ya no es posible una recuperación de errores.*/
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception{
+        System.err.println("El analizador No se recupero tras el error\nError en la Línea " + (s.right+1)+ "Columna "+(s.left+1)+". Identificador " +
+        s.value + " no reconocido.");            
+    }
+    
+    public void setValor(Nodo valor)
+    {
+        inicio = valor;
+    }
+
+
+    public void setInstrucciones(Metodo m)
+    {
+        metodo = m;
+    }
+:}
+
+
+/*Terminales*/
+
+terminal String suma, multi, resta, div, or, and, negacion;
+terminal String desigual, igualigual, igual, mayor, menor, mayorigual, menorigual;
+terminal String tint, tchar, tbool, tstring, tdouble, imprimir,cadena;
+terminal String puntocoma, llaveI, llaveD, pard, pari, identificador;
+terminal Boolean falso, verdadero;
+terminal Integer entero;
+terminal Double decimal;
+terminal char caracter;
+
+/*
+* Aquí están los no terminales
+*/
+non terminal INICIO;
+non terminal Exp  EXP, EXPL, EXPC;
+non terminal String TIPO;
+non terminal Sentencia  INSTRUCCION, DECLARACION,ASIGNACION, IMPRIMIR;
+non terminal Metodo METODO, INSTRUCCIONES;
+/* Precedencia */
+precedence left suma, resta;
+precedence left multi, div;
+precedence left and;
+precedence left or;
+
+/* ­­­­­­­­­­­­­­ Definición de la gramatica  ­­­­­­­­­­­ */
+start with INICIO; // indicamos con qué producción debe empezar la gramatica.
+
+INICIO::= METODO:valor{: setInstrucciones(valor); :}
+;
+
+
+METODO::= llaveI INSTRUCCIONES:met llaveD {: RESULT = met;:};
+
+INSTRUCCIONES::= INSTRUCCIONES:met INSTRUCCION:valor{: met.add(valor); RESULT = met;:}
+                |INSTRUCCIONES:met METODO:valor{: met.add(valor); RESULT = met;:}
+                |INSTRUCCION:valor {: Metodo met = new Metodo(); met.add(valor); RESULT = met; :}
+                |METODO:valor {:Metodo met = new Metodo(); met.add(valor); RESULT = met;:}
+;
+
+INSTRUCCION::= DECLARACION:inst puntocoma{:RESULT = inst;:}
+              |ASIGNACION:inst puntocoma{:RESULT = inst;:}
+              |IMPRIMIR:inst puntocoma{:RESULT = inst;:}
+;
+
+IMPRIMIR::= imprimir pari EXPL:valor pard {:RESULT = new Imprimir(valor);:}
+;
+
+ASIGNACION::= identificador:nombre igual EXPL:valor {:RESULT = new Asignacion(nombre, valor);:}
+;
+
+
+DECLARACION::= TIPO:tipo identificador:nombre {:RESULT  = new Declaracion(nombre,tipo);:}
+              |TIPO:tipo identificador:nombre igual EXPL:valor {:RESULT = new Declaracion(nombre, tipo, valor);:}
+;
+
+TIPO::= tint:tipo{:RESULT = tipo;:}
+       |tdouble:tipo{:RESULT = tipo;:}
+       |tbool:tipo{:RESULT = tipo;:}
+       |tchar:tipo{:RESULT = tipo;:}
+       |tstring:tipo{:RESULT = tipo;:}
+;
+
+EXPL ::= EXPC:valor1 and EXPC:valor2 {: RESULT = new And(valor1,valor2);:}
+        |EXPC:valor1 or EXPC:valor2 {: RESULT = new Or(valor1,valor2);:}
+        |negacion EXPC:valor {: RESULT = new Menos(valor);:}
+        |EXPC:valor{:RESULT = valor;:}
+;
+
+
+EXPC::= 
+     EXP:valor1 mayor EXP:valor2 {:RESULT = new MayorQue(valor1,valor2);:}
+    |EXP:valor1 menor EXP:valor2 {:RESULT = new MenorQue(valor1,valor2);:}   
+    |EXP:valor1 menorigual EXP:valor2   {:RESULT = new MayorIgual(valor1,valor2);:} 
+    |EXP:valor1 mayorigual EXP:valor2 {:RESULT = new MenorIgual(valor1,valor2);:}   
+    |EXP:valor1 igualigual EXP:valor2{:RESULT = new Igual(valor1,valor2);:}
+    |EXP:valor1 desigual EXP:valor2{:RESULT = new Diferente(valor1,valor2);:}
+    |EXP:valor1{:RESULT = valor1;:}
+
+;
+
+EXP::= 
+        EXP:valor1 suma EXP:valor2 {:RESULT = new Suma(valor1, valor2);:}      
+       |EXP:valor1 multi EXP:valor2 {:RESULT = new Multi(valor1, valor2);:}            
+       |EXP:valor1 div EXP:valor2 {:RESULT = new Div(valor1, valor2);:}
+       |EXP:valor1 resta EXP:valor2 {:RESULT = new Resta(valor1, valor2);:}
+       |pari EXP:valor pard {:RESULT = valor;:}      
+       |resta EXP:valor {: RESULT = new Menos(valor);:}
+       |decimal:valor {:RESULT = new DoubleExp(valor);:} 
+       |entero:valor {:RESULT = new IntExp(valor);:} 
+       |identificador:valor {: RESULT = new idExp(valor);:}
+       |cadena:valor {: RESULT = new StringExp(valor);:}       
+       |falso:valor {: RESULT = new BoolExp(valor);:}
+       |verdadero:valor {: RESULT = new BoolExp(valor);:}
+       |caracter:valor {:RESULT = new CharExp(valor);:}
+       ;
+
